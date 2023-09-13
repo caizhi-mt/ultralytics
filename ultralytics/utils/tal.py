@@ -25,7 +25,9 @@ def select_candidates_in_gts(xy_centers, gt_bboxes, eps=1e-9):
     lt, rb = gt_bboxes.view(-1, 1, 4).chunk(2, 2)  # left-top, right-bottom
     bbox_deltas = torch.cat((xy_centers[None] - lt, rb - xy_centers[None]), dim=2).view(bs, n_boxes, n_anchors, -1)
     # return (bbox_deltas.min(3)[0] > eps).to(gt_bboxes.dtype)
-    return bbox_deltas.amin(3).gt_(eps)
+    cpu_bbox_deltas = bbox_deltas.cpu()
+    return cpu_bbox_deltas.amin(3).gt_(eps).to(bbox_deltas.device)
+    #return bbox_deltas.amin(3).gt_(eps)
 
 
 def select_highest_overlaps(mask_pos, overlaps, n_max_boxes):
@@ -189,9 +191,14 @@ class TaskAlignedAssigner(nn.Module):
         # (b, max_num_obj, topk, h*w) -> (b, max_num_obj, h*w)
         count_tensor = torch.zeros(metrics.shape, dtype=torch.int8, device=topk_idxs.device)
         ones = torch.ones_like(topk_idxs[:, :, :1], dtype=torch.int8, device=topk_idxs.device)
+        cpu_count_tensor = count_tensor.cpu()
+        cpu_topk_idxs = topk_idxs.cpu()
+        cpu_ones = ones.cpu()
         for k in range(self.topk):
             # Expand topk_idxs for each value of k and add 1 at the specified positions
-            count_tensor.scatter_add_(-1, topk_idxs[:, :, k:k + 1], ones)
+            #count_tensor.scatter_add_(-1, topk_idxs[:, :, k:k + 1], ones)
+            cpu_count_tensor.scatter_add_(-1, cpu_topk_idxs[:, :, k:k + 1], cpu_ones)
+        count_tensor = cpu_count_tensor.to(count_tensor.device)
         # count_tensor.scatter_add_(-1, topk_idxs, torch.ones_like(topk_idxs, dtype=torch.int8, device=topk_idxs.device))
         # filter invalid bboxes
         count_tensor.masked_fill_(count_tensor > 1, 0)

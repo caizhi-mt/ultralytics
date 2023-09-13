@@ -140,7 +140,14 @@ class DetectionValidator(BaseValidator):
 
     def get_stats(self):
         """Returns metrics statistics and results dictionary."""
-        stats = [torch.cat(x, 0).cpu().numpy() for x in zip(*self.stats)]  # to numpy
+        #stats = [torch.cat(x.cpu(), 0).cpu().numpy() for x in zip(*self.stats)]  # to numpy
+        stats = []
+        for x in zip(*self.stats):
+            cpu_x = []
+            for item in x:
+                cpu_x.append(item.cpu())
+            stats.append(torch.cat(tuple(cpu_x), 0).numpy())
+
         if len(stats) and stats[0].any():
             self.metrics.process(*stats)
         self.nt_per_class = np.bincount(stats[-1].astype(int), minlength=self.nc)  # number of targets per class

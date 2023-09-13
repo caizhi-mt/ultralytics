@@ -218,12 +218,23 @@ def non_max_suppression(
         # Detections matrix nx6 (xyxy, conf, cls)
         box, cls, mask = x.split((4, nc, nm), 1)
 
+        device = box.device
+        cpu_box = box.to('cpu')
+        cpu_mask = mask.to('cpu')
         if multi_label:
             i, j = torch.where(cls > conf_thres)
-            x = torch.cat((box[i], x[i, 4 + j, None], j[:, None].float(), mask[i]), 1)
+            cpu_j = j.to('cpu')
+            cpu_i = i.to('cpu')
+            cpu_x = x.to('cpu')
+            x = torch.cat((cpu_box[cpu_i], cpu_x[cpu_i, 4 + cpu_j, None], cpu_j[:, None].float(), cpu_mask[cpu_i]), 1).to(device)
+            #x = torch.cat((box[i], x[i, 4 + j, None], j[:, None].float(), mask[i]), 1)
         else:  # best class only
             conf, j = cls.max(1, keepdim=True)
-            x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
+            cpu_conf = conf.to('cpu')
+            cpu_j = j.to('cpu')
+            cpu_concat = torch.cat((cpu_box, cpu_conf, cpu_j.float(), cpu_mask), 1)
+            x = cpu_concat.to(device)[conf.view(-1) > conf_thres]
+            #x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
 
         # Filter by class
         if classes is not None:
